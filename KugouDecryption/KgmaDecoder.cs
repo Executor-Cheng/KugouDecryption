@@ -47,7 +47,7 @@ namespace KugouDecryption
             0xAB, 0x12, 0xB2, 0x13, 0xE8, 0x84, 0xD7, 0xA7, 0x9F, 0x0F, 0x32, 0x4C, 0x55, 0x1D, 0x04, 0x36,
             0x52, 0xDC, 0x03, 0xF3, 0xF9, 0x4E, 0x42, 0xE9, 0x3D, 0x61, 0xEF, 0x7C, 0xB6, 0xB3, 0x93, 0x50,
         };
-
+        
         /// <summary>
         /// 将源文件数据解密为音频数据
         /// </summary>
@@ -69,8 +69,9 @@ namespace KugouDecryption
 #if BIGENDIAN
                 headerLength = BinaryPrimitives.ReverseEndianness(headerLength);
 #endif
-                int length = span.Length - headerLength;
-                if (length > 73155904 << 4)
+                int length = span.Length - headerLength,
+                    keyLength = (int)((uint)length >> 4) + 1;
+                if (keyLength > 73155904)
                 {
                     throw new NotSupportedException("源文件长度过长");
                 }
@@ -78,7 +79,7 @@ namespace KugouDecryption
                 using (MemoryStream ms = new(Properties.Resources.kgm_v2))
                 using (XZStream stream = new(ms))
                 {
-                    stream.Read(result.AsSpan()[..Math.Min(length, 73155904)]);
+                    stream.Read(result.AsSpan()[..keyLength]);
                 }
                 ptr = ptrBegin + span.Length;
                 fixed (byte* resultPtrBegin = result)
@@ -91,7 +92,7 @@ namespace KugouDecryption
                     {
                         int med8 = keyPtr[mod17] ^ *ptr--;
                         med8 ^= (med8 & 0xF) << 4;
-                        int msk8 = maskV2Ptr[mod272] ^ result[i >> 4];
+                        int msk8 = maskV2Ptr[mod272] ^ resultPtrBegin[i >> 4];
                         msk8 ^= (msk8 & 0xF) << 4;
                         *resultPtr-- = (byte)(med8 ^ msk8); // 避免边界检查
                         mod17--;
